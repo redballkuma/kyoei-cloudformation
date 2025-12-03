@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: A simple VPC with public and private subnets
+
+Resources:
+  MyVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.30.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: MyCloudFormationVPC
+
+  MyPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.30.1.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs '' ] # Selects the first available AZ
+      MapPublicIpOnLaunch: true # For public subnets
+      Tags:
+        - Key: Name
+          Value: MyPublicSubnet
+
+  MyPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.30.2.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs '' ] # Selects the second available AZ
+      Tags:
+        - Key: Name
+          Value: MyPrivateSubnet
+
+  MyRouteTable:
+    Type: AWS::EC2::RouteTable 
+    Properties: 
+      VpcId: !Ref MyVPC 
+      Tags:
+        - Key: Name
+          Value: MyVPC_dev
+
+  MyRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MyPublicSubnet
+      RouteTableId: !Ref MyRouteTable
+
+  MyRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MyPrivateSubnet
+      RouteTableId: !Ref MyRouteTable
+
+  S3VpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref MyVPC # Reference to your existing VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3" # S3 service name for the current region
+      VpcEndpointType: Gateway
+      RouteTableIds: 
+        - !Ref MyRouteTable
+      PolicyDocument: # Optional: Define an endpoint policy to control S3 access
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: "s3:*"
+            Resource: "*"
+            #  - !Sub "arn:aws:s3:::${MyS3BucketName}"
+            #  - !Sub "arn:aws:s3:::${MyS3BucketName}/*"
